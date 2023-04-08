@@ -1,6 +1,6 @@
 MAELSTROM_URL=https://github.com/jepsen-io/maelstrom/releases/download/v0.2.3/maelstrom.tar.bz2
 
-all: test
+all: build
 
 clean:
 	rm -rf maelstrom/
@@ -13,6 +13,12 @@ maelstrom:
 
 build:
 	go build -o ./maelstrom/echo ./echo/
+	go build -o ./maelstrom/uniqueids ./uniqueids/
 
-test: maelstrom build
-	./maelstrom/maelstrom test -w echo --bin ./maelstrom/echo --node-count 1 --time-limit 10
+test-echo: maelstrom build
+	cd maelstrom/; \
+	./maelstrom test -w echo --bin ./echo --node-count 1 --time-limit 10
+
+test-uniqueids: maelstrom build
+	cd maelstrom/; \
+	./maelstrom test -w unique-ids --bin ./uniqueids --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition
