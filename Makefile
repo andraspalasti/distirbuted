@@ -14,6 +14,7 @@ maelstrom:
 build:
 	go build -o ./maelstrom/echo ./echo/
 	go build -o ./maelstrom/uniqueids ./uniqueids/
+	go build -o ./maelstrom/broadcast ./broadcast/
 
 test-echo: maelstrom build
 	cd maelstrom/; \
@@ -22,3 +23,7 @@ test-echo: maelstrom build
 test-uniqueids: maelstrom build
 	cd maelstrom/; \
 	./maelstrom test -w unique-ids --bin ./uniqueids --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition
+
+test-broadcast: maelstrom build
+	cd maelstrom/; \
+	./maelstrom test -w broadcast --bin ./broadcast --node-count 1 --time-limit 20 --rate 10
