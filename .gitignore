@@ -1,0 +1,3 @@
+# Ignore folders used by the maelstorm workbench
+maelstrom/
+store/
