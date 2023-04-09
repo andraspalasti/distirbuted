@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
-	"time"
 
 	maelstrom "github.com/jepsen-io/maelstrom/demo/go"
 )
@@ -19,46 +18,43 @@ type ReadMessageBody struct {
 	Messages []int `json:"messages"`
 }
 
-type WriteMessageBody struct {
+type TopologyMessageBody struct {
 	maelstrom.MessageBody
-	Messages []int `json:"messages"`
-}
-
-type MsgStore[T any] struct {
-	sync.Mutex
-	messages []T
-}
-
-func NewMsgStore[T any]() *MsgStore[T] {
-	return &MsgStore[T]{
-		Mutex:    sync.Mutex{},
-		messages: []T{},
-	}
-}
-
-func (ms *MsgStore[T]) Read() []T {
-	ms.Lock()
-	defer ms.Unlock()
-
-	messages := make([]T, len(ms.messages))
-	copy(messages, ms.messages)
-	return messages
-}
-
-func (ms *MsgStore[T]) Put(messages ...T) {
-	ms.Lock()
-	defer ms.Unlock()
-
-	ms.messages = append(ms.messages, messages...)
+	Topology map[string][]string `json:"topology"`
 }
 
 func main() {
 	n := maelstrom.NewNode()
 
-	// We store all the messages here
-	messages := NewMsgStore[int]()
+	var topology map[string][]string
 
-	unbroadcasted := NewMsgStore[int]()
+	// We store all the messages here
+	messages := make(map[int]struct{})
+	mu := &sync.Mutex{}
+
+	// Saves the message and returns true if it was already in the map else false
+	save := func(message int) bool {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if _, ok := messages[message]; ok {
+			return true
+		}
+		messages[message] = struct{}{}
+		return false
+	}
+
+	// Reads all the messages into a slice and returns it
+	readAll := func() []int {
+		mu.Lock()
+		defer mu.Unlock()
+
+		buf := make([]int, 0, len(messages))
+		for message := range messages {
+			buf = append(buf, message)
+		}
+		return buf
+	}
 
 	n.Handle("broadcast", func(msg maelstrom.Message) error {
 		var body BroadcastMessageBody
@@ -66,53 +62,47 @@ func main() {
 			return err
 		}
 
-		unbroadcasted.Put(body.Message)
+		if save(body.Message) {
+			return nil
+		}
 
+		// Broadcast message for neighbours
+		for _, nodeId := range topology[n.ID()] {
+			if nodeId == msg.Src {
+				continue
+			}
+
+			if err := n.Send(nodeId, BroadcastMessageBody{
+				MessageBody: maelstrom.MessageBody{Type: "broadcast"},
+				Message:     body.Message,
+			}); err != nil {
+				return err
+			}
+		}
+
+		// If the src is a node than we dont have to send a broadcast_ok reply
+		if _, ok := topology[msg.Src]; ok {
+			return nil
+		}
 		return n.Reply(msg, maelstrom.MessageBody{Type: "broadcast_ok"})
 	})
 
 	n.Handle("read", func(msg maelstrom.Message) error {
 		return n.Reply(msg, ReadMessageBody{
 			MessageBody: maelstrom.MessageBody{Type: "read_ok"},
-			Messages:    messages.Read(),
+			Messages:    readAll(),
 		})
 	})
 
-	n.Handle("write", func(msg maelstrom.Message) error {
-		var body WriteMessageBody
+	n.Handle("topology", func(msg maelstrom.Message) error {
+		var body TopologyMessageBody
 		if err := json.Unmarshal(msg.Body, &body); err != nil {
 			return err
 		}
 
-		messages.Put(body.Messages...)
-		return nil
-	})
-
-	n.Handle("topology", func(msg maelstrom.Message) error {
+		topology = body.Topology
 		return n.Reply(msg, maelstrom.MessageBody{Type: "topology_ok"})
 	})
-
-	// From time to time broadcast the unbroadcasted messages to each node
-	go func() {
-		ticker := time.NewTicker(time.Duration(200) * time.Millisecond)
-		for {
-			shouldWrite := unbroadcasted.Read()
-
-			for _, nodeId := range n.NodeIDs() {
-				if n.ID() == nodeId {
-					continue
-				}
-
-				n.Send(nodeId, WriteMessageBody{
-					MessageBody: maelstrom.MessageBody{Type: "write"},
-					Messages:    shouldWrite,
-				})
-			}
-
-			messages.Put(shouldWrite...)
-			<-ticker.C
-		}
-	}()
 
 	if err := n.Run(); err != nil {
 		log.Fatal(err)
