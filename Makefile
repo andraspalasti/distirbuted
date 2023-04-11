@@ -27,5 +27,6 @@ test-uniqueids: maelstrom build
 test-broadcast: maelstrom build
 # For part a: ./maelstrom test -w broadcast --bin ./broadcast --node-count 1 --time-limit 20 --rate 10
 # For part b: ./maelstrom test -w broadcast --bin ./broadcast --node-count 5 --time-limit 20 --rate 10
+# For part c: ./maelstrom test -w broadcast --bin ./broadcast --node-count 5 --time-limit 20 --rate 10 --nemesis partition
 	cd maelstrom/; \
-	./maelstrom test -w broadcast --bin ./broadcast --node-count 5 --time-limit 20 --rate 10 --nemesis partition
+	./maelstrom test -w broadcast --bin ./broadcast --node-count 25 --time-limit 20 --rate 100 --latency 100

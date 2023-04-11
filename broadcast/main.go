@@ -10,9 +10,9 @@ import (
 )
 
 func main() {
-	solutions := map[string]func(){"a": PartA, "b": PartB, "c": PartC}
+	solutions := map[string]func(){"a": PartA, "b": PartB, "c": PartC, "d": PartD}
 
-	part := flag.String("part", "c", "Specifies the part of the challenge to run. For example its value could be a, b, c, d, e")
+	part := flag.String("part", "d", "Specifies the part of the challenge to run. For example its value could be a, b, c, d, e")
 	flag.Parse()
 
 	fn := solutions[*part]
