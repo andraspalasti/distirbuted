@@ -10,21 +10,16 @@ import (
 )
 
 // Broadcast a message to all neighbouring nodes until all of them respond with a "broadcast_ok"
-func (s *Server) BroadcastLoop(src string, message int) {
-	sendTo := s.neighbours
+func (s *Server) BroadcastLoop(sendTo []string, message int) {
 	respCh := make(chan struct {
 		dest   string
 		failed bool
 	})
 
-	for {
+	for 0 < len(sendTo) {
 		for _, neighbour := range sendTo {
-			if neighbour == src {
-				continue
-			}
-
 			go func(dest string) {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(50)*time.Millisecond)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(250)*time.Millisecond)
 				defer cancel()
 
 				_, err := s.SyncRPC(ctx, dest, BroadcastMessageBody{
@@ -38,18 +33,14 @@ func (s *Server) BroadcastLoop(src string, message int) {
 			}(neighbour)
 		}
 
-		fails := make([]string, 0, len(sendTo))
+		failed := make([]string, 0, len(sendTo))
 		for i := 0; i < len(sendTo); i++ {
-			resp := <-respCh
-			if resp.failed {
-				fails = append(fails, resp.dest)
+			broadcast := <-respCh
+			if broadcast.failed {
+				failed = append(failed, broadcast.dest)
 			}
 		}
-
-		if len(fails) == 0 {
-			break
-		}
-		sendTo = fails
+		sendTo = failed
 	}
 }
 
@@ -67,8 +58,16 @@ func PartC() {
 			return err
 		}
 
-		s.Save(body.Message)
-		s.BroadcastLoop(msg.Src, body.Message)
+		if !s.Save(body.Message) {
+			sendTo := make([]string, 0, len(s.neighbours))
+			for _, neighbour := range s.neighbours {
+				if neighbour != msg.Src {
+					sendTo = append(sendTo, neighbour)
+				}
+			}
+
+			s.BroadcastLoop(sendTo, body.Message)
+		}
 		return nil
 	})
 	s.Handle("topology", s.TopologyHandler)
