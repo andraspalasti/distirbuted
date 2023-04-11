@@ -10,9 +10,15 @@ import (
 )
 
 func main() {
-	solutions := map[string]func(){"a": PartA, "b": PartB, "c": PartC, "d": PartD}
+	solutions := map[string]func(){
+		"a": PartA, // Single node broadcast
+		"b": PartB, // Multi node broadcast
+		"c": PartC, // Fault tolerant broadcast
+		"d": PartD, // Efficient broadcast part 1
+		"e": PartE, // Efficient broadcast part 2
+	}
 
-	part := flag.String("part", "d", "Specifies the part of the challenge to run. For example its value could be a, b, c, d, e")
+	part := flag.String("part", "e", "Specifies the part of the challenge to run. For example its value could be a, b, c, d, e")
 	flag.Parse()
 
 	fn := solutions[*part]
@@ -45,13 +51,13 @@ type Server struct {
 	neighbours []string
 
 	mu       sync.Mutex
-	messages map[int]struct{}
+	messages map[int]bool
 }
 
 func NewServer() *Server {
 	return &Server{
 		Node:     maelstrom.NewNode(),
-		messages: make(map[int]struct{}),
+		messages: make(map[int]bool),
 	}
 }
 
@@ -62,7 +68,7 @@ func (s *Server) Save(message int) bool {
 	defer s.mu.Unlock()
 
 	_, ok := s.messages[message]
-	s.messages[message] = struct{}{}
+	s.messages[message] = true
 	return ok
 }
 
