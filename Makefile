@@ -15,6 +15,7 @@ build:
 	go build -o ./maelstrom/echo ./echo/
 	go build -o ./maelstrom/uniqueids ./uniqueids/
 	go build -o ./maelstrom/broadcast ./broadcast/
+	go build -o ./maelstrom/counter ./counter/
 
 test-echo: maelstrom build
 	cd maelstrom/; \
@@ -31,3 +32,7 @@ test-broadcast: maelstrom build
 # For part d and e the command is the same
 	cd maelstrom/; \
 	./maelstrom test -w broadcast --bin ./broadcast --node-count 25 --time-limit 20 --rate 100 --latency 100
+
+test-counter: maelstrom build
+	cd maelstrom/; \
+	./maelstrom test -w g-counter --bin ./counter --node-count 3 --rate 100 --time-limit 20 --nemesis partition
