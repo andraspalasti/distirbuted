@@ -16,6 +16,7 @@ build:
 	go build -o ./maelstrom/uniqueids ./uniqueids/
 	go build -o ./maelstrom/broadcast ./broadcast/
 	go build -o ./maelstrom/counter ./counter/
+	go build -o ./maelstrom/kafka ./kafka/
 
 test-echo: maelstrom build
 	cd maelstrom/; \
@@ -36,3 +37,7 @@ test-broadcast: maelstrom build
 test-counter: maelstrom build
 	cd maelstrom/; \
 	./maelstrom test -w g-counter --bin ./counter --node-count 3 --rate 100 --time-limit 20 --nemesis partition
+
+test-kafka: maelstrom build
+	cd maelstrom/; \
+	./maelstrom test -w kafka --bin ./kafka --node-count 1 --concurrency 2n --time-limit 20 --rate 1000
