@@ -9,3 +9,11 @@ on initalization, also each node keeps track of a counter value which is
 incremented, on each generate request.
 
 We concatenate these two, and we get the globally unique ID that we send back. 
+
+
+## Broadcast challenges
+
+- **b)**: Because we know that there will be no network partitions we can
+ assume that all messages will be delivered. When a node recieves a broadcast
+ it checks if it came from another node or not, if another node sent it, then
+ it doesn't need to broadcast it further, else it needs to sent to all others.

@@ -3,46 +3,67 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"sync"
 
 	maelstrom "github.com/jepsen-io/maelstrom/demo/go"
 )
 
 func PartB() {
-	s := NewServer()
+	n := maelstrom.NewNode()
 
-	s.Handle("broadcast", func(msg maelstrom.Message) error {
+	// We store the recieved messages here
+	messages := []int{}
+	mu := &sync.Mutex{}
+
+	n.Handle("broadcast", func(msg maelstrom.Message) error {
 		var body BroadcastMessageBody
 		if err := json.Unmarshal(msg.Body, &body); err != nil {
 			return err
 		}
 
-		if s.Save(body.Message) {
-			return nil
+		mu.Lock()
+		defer mu.Unlock()
+		messages = append(messages, body.Message)
+
+		// Don't need to reply and rebroadcast if sender is a node
+		for _, nodeId := range n.NodeIDs() {
+			if msg.Src == nodeId {
+				return nil
+			}
 		}
 
-		// Broadcast message for neighbours
-		for _, nodeId := range s.neighbours {
-			if nodeId == msg.Src {
+		// Broadcast to all nodes except the sender
+		for _, nodeId := range n.NodeIDs() {
+			if nodeId == msg.Src || nodeId == n.ID() {
 				continue
 			}
 
-			s.Send(nodeId, BroadcastMessageBody{
+			err := n.Send(nodeId, BroadcastMessageBody{
 				MessageBody: maelstrom.MessageBody{Type: "broadcast"},
 				Message:     body.Message,
 			})
+			if err != nil {
+				return err
+			}
 		}
-
-		// We don't use MsgIDs for inter communication
-		// so we know that this is coming from a node
-		if body.MsgID == 0 {
-			return nil
-		}
-		return s.Reply(msg, maelstrom.MessageBody{Type: "broadcast_ok"})
+		return n.Reply(msg, maelstrom.MessageBody{Type: "broadcast_ok"})
 	})
-	s.Handle("read", s.ReadHandler)
-	s.Handle("topology", s.TopologyHandler)
 
-	if err := s.Run(); err != nil {
+	n.Handle("read", func(msg maelstrom.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
+
+		return n.Reply(msg, ReadMessageBody{
+			MessageBody: maelstrom.MessageBody{Type: "read_ok"},
+			Messages:    messages,
+		})
+	})
+
+	n.Handle("topology", func(msg maelstrom.Message) error {
+		return n.Reply(msg, maelstrom.MessageBody{Type: "topology_ok"})
+	})
+
+	if err := n.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
