@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"slices"
 	"sync"
 	"time"
 
@@ -19,7 +20,6 @@ func PartC() {
 
 	// Ticker to trigger a distribution of unverified messages
 	ticker := time.NewTicker(time.Millisecond * 100)
-	shouldDistribute := make(chan struct{})
 
 	broadcast := func(dest string, message int) error {
 		return n.RPC(dest,
@@ -30,13 +30,10 @@ func PartC() {
 			func(msg maelstrom.Message) error {
 				mu.Lock()
 				defer mu.Unlock()
-				filtered := unverified[dest][:0]
-				for _, m := range unverified[dest] {
-					if m != message {
-						filtered = append(filtered, m)
-					}
-				}
-				unverified[dest] = filtered
+				unverified[dest] = slices.DeleteFunc(
+					unverified[dest],
+					func(m int) bool { return m == message },
+				)
 				return nil
 			},
 		)
@@ -66,10 +63,8 @@ func PartC() {
 		messages[body.Message] = struct{}{}
 
 		// Don't need to rebroadcast if sender is a node
-		for _, nodeId := range n.NodeIDs() {
-			if nodeId == msg.Src {
-				return nil
-			}
+		if slices.Contains(n.NodeIDs(), msg.Src) {
+			return nil
 		}
 
 		// Add to unverified list
@@ -79,11 +74,6 @@ func PartC() {
 			}
 			unverified[nodeId] = append(unverified[nodeId], body.Message)
 		}
-
-		// Trigger a distribution
-		shouldDistribute <- struct{}{}
-		ticker.Reset(time.Millisecond * 100)
-
 		return nil
 	})
 
@@ -92,7 +82,7 @@ func PartC() {
 		defer mu.Unlock()
 
 		buf := make([]int, 0, len(messages))
-		for m, _ := range messages {
+		for m := range messages {
 			buf = append(buf, m)
 		}
 
@@ -108,20 +98,12 @@ func PartC() {
 
 	go func() {
 		for {
-			select {
-			case <-ticker.C:
-			case <-shouldDistribute:
-			}
+			<-ticker.C
 
 			mu.Lock()
 			for nodeId, messages := range unverified {
 				for _, message := range messages {
-					for _, neighbour := range n.NodeIDs() {
-						if neighbour == nodeId {
-							continue
-						}
-						broadcast(neighbour, message)
-					}
+					broadcast(nodeId, message)
 				}
 			}
 			mu.Unlock()

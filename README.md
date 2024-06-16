@@ -17,3 +17,19 @@ We concatenate these two, and we get the globally unique ID that we send back.
  assume that all messages will be delivered. When a node recieves a broadcast
  it checks if it came from another node or not, if another node sent it, then
  it doesn't need to broadcast it further, else it needs to sent to all others.
+
+- **c)**: Now there is no guarantee that each node will actually get the 
+  messages between each other. So we need to keep track of which message was
+  actually received by which node.
+  Each node does the same:
+    1. When a broadcast is received, it is added to the list of recieved messages.
+      If it didn't came from another node, then it is to be distributed to all.
+    1. The messages that are to be distributed are only marked as sent after 
+      the destination node confirms that it recieved it.
+
+- **d)**: The previous solution is working fine in this case too, the only
+  change is that the distribution of messages are done less frequently.
+
+- **e)**: In this case to reduce the number of messages between nodes, we batch
+  them together.
+

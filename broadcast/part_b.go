@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"slices"
 	"sync"
 
 	maelstrom "github.com/jepsen-io/maelstrom/demo/go"
@@ -26,10 +27,8 @@ func PartB() {
 		messages = append(messages, body.Message)
 
 		// Don't need to reply and rebroadcast if sender is a node
-		for _, nodeId := range n.NodeIDs() {
-			if msg.Src == nodeId {
-				return nil
-			}
+		if slices.Contains(n.NodeIDs(), msg.Src) {
+			return nil
 		}
 
 		// Broadcast to all nodes except the sender
